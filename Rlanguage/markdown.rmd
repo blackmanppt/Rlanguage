@@ -1,0 +1,148 @@
+---
+title: "HomeWork"
+output: html_document
+---
+<div class="section level1">
+<div name="綜合演練" data-unique="綜合演練"></div><h1>綜合演練</h1>
+<p>小明想知道信義區的腳踏車站晴天和雨天的使用率有何差別 提示： - <code>filter</code>、<code>mutate</code>、<code>select</code>、<code>group_by</code>、<code>summarise</code> - <code>dcast</code> - <code>arrange</code></p>
+<table class="table table-condensed">
+<thead>
+<tr class="header">
+<th align="left">sna</th>
+<th align="center">晴天</th>
+<th align="center">雨天</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">永吉松信路口</td>
+<td align="center">0.8720583</td>
+<td align="center">0.4744500</td>
+</tr>
+<tr class="even">
+<td align="left">信義廣場(台北101)</td>
+<td align="center">0.7952094</td>
+<td align="center">0.5329188</td>
+</tr>
+<tr class="odd">
+<td align="left">捷運永春站(2號出口)</td>
+<td align="center">0.7888917</td>
+<td align="center">0.4466667</td>
+</tr>
+<tr class="even">
+<td align="left">市民廣場</td>
+<td align="center">0.7369417</td>
+<td align="center">0.3238917</td>
+</tr>
+<tr class="odd">
+<td align="left">捷運台北101/世貿站</td>
+<td align="center">0.7294856</td>
+<td align="center">0.6448654</td>
+</tr>
+<tr class="even">
+<td align="left">基隆光復路口</td>
+<td align="center">0.7277750</td>
+<td align="center">0.7589000</td>
+</tr>
+<tr class="odd">
+<td align="left">仁愛逸仙路口</td>
+<td align="center">0.6532895</td>
+<td align="center">0.5921053</td>
+</tr>
+<tr class="even">
+<td align="left">三張犁</td>
+<td align="center">0.6409129</td>
+<td align="center">0.4242424</td>
+</tr>
+<tr class="odd">
+<td align="left">五常公園</td>
+<td align="center">0.6233278</td>
+<td align="center">0.3536944</td>
+</tr>
+<tr class="even">
+<td align="left">中強公園</td>
+<td align="center">0.6216667</td>
+<td align="center">0.7833333</td>
+</tr>
+</tbody>
+</table>
+<br>
+<hr>
+<p><br></p>
+</div>
+
+```{r}
+#讀取CSV資料
+ubike <- read.csv(file = "./ubike-weather-big5.csv",
+          colClasses = c("factor", "integer", "integer", "factor", "factor",
+                         "numeric", "numeric", "integer", "numeric", "integer",
+                         "integer", "numeric", "numeric", "integer", "integer",
+                         "numeric", "numeric", "numeric", "numeric", "numeric",
+                         "numeric", "numeric", "numeric"),
+          fileEncoding = 'BIG-5',
+          stringsAsFactors = F)
+```
+引用套件
+dplyr:優化使用<br/>
+reshape2:為使用dcast,fun.aggregate<br/>
+knitr:表格套件
+```{r}
+library(dplyr)
+library(reshape2)
+library(knitr)
+library(ggmap)
+library(plotly)
+library(ggplot2)
+```
+確認資料
+```{r}
+str(ubike)
+```
+
+資料正規劃
+```{r}
+zzzz <- (select(ubike, sarea, sna, rainfall, avg.bemp, tot, lat, lng) %>%
+#搜尋信義區
+filter(sarea == "信義區") %>%
+#判斷是否雨天,降雨為0都為晴天
+#但透過View看過資料後發現有NA的資料,加入判斷空值
+#using為使用率=空車位/實際車位
+mutate(day = ifelse(is.na(rainfall) | rainfall == 0, "晴天", "雨天"), using = avg.bemp / tot) %>%
+select(sarea, sna, day, using, tot, lat, lng))
+
+```
+轉換成圖表後，可以看到晴天的租借率大部分都高於雨天
+```{r}
+#使用Dcast將晴天雨天的類型座位顯示資料展開
+display <- dcast(zzzz, formula = sna ~ day, fun.aggregate = mean, value.var = "using")
+#轉換表格模式
+kable(display)
+```
+
+將晴天雨天資料個別抽出在地圖上呈現<br/>
+可以明顯的看到市區的使用率較高，山腳下的使用率較低<br/>
+唯一較特別的是光復南路雨天的使用率高於晴天
+```{r, fig.width=10, fig.height=10}
+#抽出晴天資料
+sun <- filter(zzzz, day == "晴天")
+#抽出雨天資料
+rain <- filter(zzzz, day == "雨天")
+#依作標代抓出GOOGLE MAP信義區地圖
+map <- get_map(location = c(lon = 121.570555, lat = 25.032721), zoom = 14)
+#將座標帶入地圖
+晴天地圖<-(ggmap(map) +
+geom_point(data = sun, aes(x = lng, y = lat, color = using)))
+雨天地圖 <- (ggmap(map) +
+geom_point(data = rain, aes(x = lng, y = lat, color = using)))
+#顯示
+晴天地圖
+雨天地圖
+```
+調整圖案常寬高，但是資料文字仍是太多<br/>
+使用ggplotly增加資料檢視可是性<br/>
+資料大多為雨天的資料
+```{r, fig.width=10, fig.height=5}
+xxxxxx <- (ggplot(zzzz, aes(sna, fill = day)) + geom_bar(position = "dodge"))
+#使用ggplotly
+ggplotly(xxxxxx)
+```

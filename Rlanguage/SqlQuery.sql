@@ -1,0 +1,1 @@
+﻿select * from [dbo].[View訂單採購單採購數量]
